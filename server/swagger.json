@@ -1,0 +1,746 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Friend Request API",
+    "version": "1.0.0",
+    "description": "API for managing users, authentication, friend requests, and blocking."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "password": { "type": "string" },
+          "friends": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "blocked": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      },
+      "UserWithFriends": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "friends": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "blocked": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "FriendRequest": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "status": { 
+            "type": "string", 
+            "enum": ["pending", "accepted", "rejected", "cancelled"] 
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "FriendRequestPopulated": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "from": {
+            "type": "object",
+            "properties": {
+              "_id": { "type": "string" },
+              "username": { "type": "string" }
+            }
+          },
+          "to": {
+            "type": "object",
+            "properties": {
+              "_id": { "type": "string" },
+              "username": { "type": "string" }
+            }
+          },
+          "status": { 
+            "type": "string", 
+            "enum": ["pending", "accepted", "rejected", "cancelled"] 
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "user": { "type": "string" },
+          "action": { "type": "string" },
+          "targetUser": {
+            "type": "object",
+            "properties": {
+              "_id": { "type": "string" },
+              "username": { "type": "string" }
+            }
+          },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "token": { "type": "string" }
+        }
+      },
+      "PendingRequests": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FriendRequestPopulated" }
+          },
+          "received": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FriendRequestPopulated" }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "email", "password"],
+                "properties": {
+                  "username": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 6 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or user already exists",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login a user",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emailOrUsername", "password"],
+                "properties": {
+                  "emailOrUsername": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/send": {
+      "post": {
+        "summary": "Send a friend request",
+        "description": "Send a friend request to another user. Rate limited to prevent spam.",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to"],
+                "properties": {
+                  "to": { "type": "string", "description": "User ID to send request to" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Friend request sent successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (can't friend yourself, already friends, request exists)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot send request, user is blocked",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipient not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/respond": {
+      "post": {
+        "summary": "Accept or reject a friend request",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["requestId", "action"],
+                "properties": {
+                  "requestId": { "type": "string" },
+                  "action": { "type": "string", "enum": ["accept", "reject"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Friend request updated successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request already handled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Not authorized to respond to this request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/cancel": {
+      "post": {
+        "summary": "Cancel a sent friend request",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["requestId"],
+                "properties": {
+                  "requestId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Friend request cancelled successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized or request not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/remove": {
+      "post": {
+        "summary": "Remove a friend",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["friendId"],
+                "properties": {
+                  "friendId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Friend removed successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Friend ID is required",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to remove friend",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/mutual/{userId}": {
+      "get": {
+        "summary": "Get mutual friends with another user",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the user to find mutual friends with"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of mutual friends",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/UserPublic" }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/list": {
+      "get": {
+        "summary": "Get current user's friends list",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of user's friends",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/UserPublic" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/friends/pending": {
+      "get": {
+        "summary": "Get pending sent and received friend requests",
+        "tags": ["Friends"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Pending friend requests",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PendingRequests" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/search/{username}": {
+      "get": {
+        "summary": "Search user by username",
+        "tags": ["Users"],
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Username to search for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/audit-log": {
+      "get": {
+        "summary": "Get audit log of user actions",
+        "tags": ["Users"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User's audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AuditLog" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/all": {
+      "get": {
+        "summary": "Get all users (excluding current user)",
+        "tags": ["Users"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of all users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/UserPublic" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/block/{id}": {
+      "post": {
+        "summary": "Block a user",
+        "tags": ["Users"],
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the user to block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User blocked successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Can't block yourself or already blocked",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/unblock/{id}": {
+      "post": {
+        "summary": "Unblock a user",
+        "tags": ["Users"],
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the user to unblock"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User unblocked successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "User not blocked",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "Get all users (admin only)",
+        "tags": ["Admin"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of all users with full details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/UserWithFriends" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/logs": {
+      "get": {
+        "summary": "Get all audit logs (admin only)",
+        "tags": ["Admin"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "All audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AuditLog" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
