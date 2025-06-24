@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-
+import { useNavigate } from "react-router-dom";
 export default function Profile() {
   const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
-
+   const navigate = useNavigate();
   // Fetch users & blocked list when user is loaded
   useEffect(() => {
 
@@ -73,6 +73,9 @@ export default function Profile() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+         <Button variant="outline" onClick={() => navigate("/dashboard")}>
+        ← Back to Dashboard
+      </Button>
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>

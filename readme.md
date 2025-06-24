@@ -67,7 +67,7 @@ devify-intern-assignment/
 
 ```bash
 git clone https://github.com/yourusername/friend-request-system.git
-cd devify-intern-assignment
+cd friend-request-system     
 ```
 
 2. Install dependencies:
