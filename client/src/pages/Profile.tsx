@@ -73,7 +73,7 @@ export default function Profile() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-         <Button variant="outline" onClick={() => navigate("/dashboard")}>
+         <Button  className="p-6 mb-2" variant="outline" onClick={() => navigate("/dashboard")}>
         ← Back to Dashboard
       </Button>
       <Card>
